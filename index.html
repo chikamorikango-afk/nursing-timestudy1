@@ -286,7 +286,7 @@ function renderSess(){
   const tr=document.createElement("tr"),cur=s.id===db.cur,pd=s.records.length&&s.upd>s.sync;if(pd)pend++;
   [(s.workdate||"—")+(cur?"●":""),s.dept||"—",s.shift,s.records.length+"件",!s.records.length?"—":pd?"未送信":"送信済"].forEach(v=>{const td=document.createElement("td");td.textContent=v;tr.append(td)});
   const td=document.createElement("td"),w=document.createElement("div");w.className="act";
-  const o=document.createElement("button");o.textContent="開く";o.disabled=cur||(started&&!ended);o.onclick=()=>openRec(s.id);
+  const o=document.createElement("button");o.textContent="開く";o.disabled=(cur&&view==="work")||(started&&!ended);o.onclick=()=>openRec(s.id);
   const d=document.createElement("button");d.textContent="削除";d.className="danger";d.onclick=()=>delSess(s.id);
   w.append(o,d);td.append(w);tr.append(td);b.append(tr)});
  $("sessEmpty").classList.toggle("hidden",b.children.length>0);
