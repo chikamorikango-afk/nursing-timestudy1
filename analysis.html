@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>看護業務時間 分析</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--text:#1f2d3d;--mut:#5d6b7a;--line:#d5dce4;--navy:#29445c;--acc:#2a78d6;--warn:#fff4d6;--sub:#e8eef4}
+@media(prefers-color-scheme:dark){:root{--bg:#14181d;--card:#1d242c;--text:#e6ebf0;--mut:#9aa8b6;--line:#34404c;--navy:#1f3347;--acc:#5aa0f0;--warn:#3a3217;--sub:#26313c}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.7 -apple-system,"Hiragino Sans","Yu Gothic",Meiryo,sans-serif}
+header{background:var(--navy);color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+header h1{margin:0;font-size:19px}
+main{max-width:1100px;margin:0 auto;padding:14px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+h2{font-size:17px;margin:0 0 4px}h3{font-size:14px;margin:14px 0 6px;color:var(--navy)}
+@media(prefers-color-scheme:dark){h3{color:#9fc4ee}}
+.pur{color:var(--mut);font-size:13px;margin:0 0 10px}
+label{font-size:12px;color:var(--mut);display:block}
+input,select{width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--text);font-size:14px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}.f{flex:1;min-width:130px}
+button{border:0;border-radius:8px;padding:9px 14px;font-size:14px;font-weight:600;background:var(--sub);color:var(--text);cursor:pointer}
+button.p{background:var(--navy);color:#fff}
+nav{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}nav button{background:var(--card);border:1px solid var(--line)}nav button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.tab{display:none}.tab.on{display:block}
+.svg{width:100%;height:auto;display:block}
+.lb{font-size:12px;fill:var(--text)}.in{font-size:11px;fill:#fff;font-weight:600}.sm{font-size:11px;fill:var(--mut)}.ax{stroke:var(--line)}
+.leg{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--mut);margin:6px 0}.leg i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.cm{background:var(--warn);border-radius:8px;padding:8px 14px 4px;margin-top:10px}.cm ul{margin:4px 0 8px;padding-left:20px}.cm li{margin-bottom:4px}
+.cm small{color:var(--mut)}
+.msg{font-size:13px;color:var(--mut);margin-top:6px}.err{color:#c0392b}
+.hidden{display:none!important}.sum{font-size:13px;color:var(--mut);margin:0 0 10px}
+@media print{header button,#login,.filt,nav{display:none!important}.tab{display:block!important;break-inside:avoid;page-break-after:always}body{background:#fff}}
+</style>
+</head>
+<body>
+<header><h1>看護業務時間　分析</h1><button id="print">印刷</button></header>
+<main>
+<section id="login" class="panel">
+ <h2>データの読み込み</h2>
+ <p class="pur">分析担当者用の画面です。送信先URLと、分析用の合言葉（看護師の送信用の合言葉とは別のもの）を入力してください。</p>
+ <div class="row"><div class="f" style="flex:3"><label for="url">送信先URL（…/exec）</label><input id="url" type="url" placeholder="https://script.google.com/macros/s/…/exec"></div>
+ <div class="f"><label for="tok">分析用の合言葉</label><input id="tok" type="password" autocomplete="off"></div>
+ <button id="load" class="p">読み込む</button></div>
+ <div id="lmsg" class="msg"></div>
+</section>
+
+<section id="board" class="hidden">
+ <div class="panel filt">
+  <div class="row">
+   <div class="f"><label for="fd">部署</label><select id="fd"></select></div>
+   <div class="f"><label for="fs">勤務区分</label><select id="fs"></select></div>
+   <div class="f"><label for="ff">期間（から）</label><input id="ff" type="date"></div>
+   <div class="f"><label for="ft">期間（まで）</label><input id="ft" type="date"></div>
+  </div>
+  <div id="scope" class="sum" style="margin:8px 0 0"></div>
+ </div>
+ <nav id="nav">
+  <button data-t="1" class="on">① 部署間比較</button><button data-t="2">② 業務別</button><button data-t="3">③ 勤務区分比較</button><button data-t="4">④ 部署内のばらつき</button><button data-t="5">⑤ 時間帯別</button>
+ </nav>
+
+ <div id="t1" class="tab on panel">
+  <h2>① 部署間比較</h2><p class="pur">部署ごとの業務構成の違い（休憩を除く時間の割合）</p>
+  <div class="row"><div class="f" style="max-width:260px"><label for="m1">構成の見方</label><select id="m1"><option value="sp">専門性区分（①②③）</option><option value="grp">業務の大分類</option></select></div></div>
+  <div class="leg" id="l1"></div><div id="c1"></div><div id="x1" class="cm"></div>
+ </div>
+ <div id="t2" class="tab panel">
+  <h2>② 業務別</h2><p class="pur">時間のかかっている業務（上位15業務）　◎は見直し検討対象</p>
+  <div class="leg" id="l2"></div><div id="c2"></div><div id="x2" class="cm"></div>
+ </div>
+ <div id="t3" class="tab panel">
+  <h2>③ 勤務区分比較</h2><p class="pur">日勤・夜勤などの違い（この画面では、上の「勤務区分」の絞り込みは使いません）</p>
+  <div class="row"><div class="f" style="max-width:260px"><label for="m3">構成の見方</label><select id="m3"><option value="grp">業務の大分類</option><option value="sp">専門性区分（①②③）</option></select></div></div>
+  <div class="leg" id="l3"></div><div id="c3"></div><div id="x3" class="cm"></div>
+ </div>
+ <div id="t4" class="tab panel">
+  <h2>④ 部署内のばらつき</h2><p class="pur">日や人による偏り（上の「部署」で、1つの部署を選んでください）</p>
+  <div class="row"><div class="f" style="max-width:300px"><label for="m4">ばらつきを見る指標</label><select id="m4"></select></div></div>
+  <div id="c4"></div><div id="x4" class="cm"></div>
+ </div>
+ <div id="t5" class="tab panel">
+  <h2>⑤ 時間帯別</h2><p class="pur">業務が集中する時間帯（各行は、その業務の時間全体のうち、どの時間帯に行われているかの割合）</p>
+  <div class="row"><div class="f" style="max-width:260px"><label for="m5">行の単位</label><select id="m5"><option value="grp">業務の大分類</option><option value="task">業務（22項目）</option></select></div></div>
+  <div id="c5"></div><div id="x5" class="cm"></div>
+ </div>
+ <p class="msg">グラフの割合は、休憩を除いた記録時間の合計に対する割合です。解析コメントは、数値から自動で作成した参考の文章で、原因や良し悪しを判断するものではありません。</p>
+</section>
+</main>
+<script>
+const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const GRP=["直接看護","診療の補助","間接看護","記録・事務","連携・管理・教育","その他"],GCOL=["#2a78d6","#138a5e","#d4561f","#7a52c7","#a87800","#6b7785"];
+const SPK=["①看護師必須（専門性高）","②看護師主体・一部移管可","③看護師以外も可","対象外"],SPN=["①看護師必須","②主体・一部移管可","③看護師以外も可","対象外"],SPC=["#2a78d6","#d4561f","#138a5e","#8a95a3"];
+const SHIFTS=["日勤","1-9","公準深","準深","早出1","早出2","早出3","遅出1","遅出2","遅出3","遅出4","遅出5","遅出6","準夜","深夜","公準"];
+let DB=[],GL=GRP.slice(),GC=GCOL.slice(),CUR=1;
+const f0=x=>Math.round(x),f1=x=>x.toFixed(1),pct=(a,b)=>b?a/b*100:0;
+const sumMin=(a,fn)=>a.reduce((s,r)=>s+(!fn||fn(r)?r.min:0),0),nSess=a=>new Set(a.map(r=>r.sid)).size;
+const groupBy=(a,fn)=>{const m=new Map();a.forEach(r=>{const k=fn(r);if(!m.has(k))m.set(k,[]);m.get(k).push(r)});return m};
+const dow=d=>"日月火水木金土"[new Date(d+"T00:00:00").getDay()],dlabel=d=>d.slice(5).replace("-","/")+"("+dow(d)+")";
+
+/* ---------- 読み込み ---------- */
+function parse(r){const sp=SPK.includes(r[17])?r[17]:SPK[3];return{sid:String(r[0]),date:String(r[2]).slice(0,10),dept:r[4],shift:String(r[5]),staff:String(r[8]||""),
+ st:new Date(String(r[9]).replace(" ","T")),en:new Date(String(r[10]).replace(" ","T")),min:+r[13]||0,grp:r[14]||"その他",task:r[16],sp:sp,rv:+r[18]===1,inc:+r[20]===1}}
+async function load(){const u=$("url").value.trim(),t=$("tok").value;if(!u||!t){$("lmsg").textContent="URLと合言葉を入力してください。";return}
+ try{localStorage.setItem("ana_cfg",JSON.stringify({u:u}))}catch(e){}
+ $("lmsg").className="msg";$("lmsg").textContent="読み込み中…";
+ try{const res=await fetch(u,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"data",token:t})});
+  const j=await res.json();if(!j.ok)throw new Error(j.error||"読み込みに失敗しました");
+  DB=j.rows.map(parse).filter(r=>r.inc&&r.min>0&&!isNaN(r.st));if(!DB.length)throw new Error("分析できるデータがありません");
+  const ex=[...new Set(DB.map(r=>r.grp))].filter(g=>!GRP.includes(g));GL=GRP.concat(ex);GC=GCOL.concat(ex.map(()=>"#8a95a3"));
+  $("lmsg").textContent=DB.length+"件の記録を読み込みました。";start()}
+ catch(e){$("lmsg").className="msg err";$("lmsg").textContent="読み込めませんでした。（"+e.message+"）"}}
+function start(){const depts=[...new Set(DB.map(r=>r.dept))].sort(),shs=[...new Set(DB.map(r=>r.shift))].sort((a,b)=>(SHIFTS.indexOf(a)+99)%99-(SHIFTS.indexOf(b)+99)%99);
+ $("fd").innerHTML='<option value="">全部署</option>'+depts.map(d=>`<option>${esc(d)}</option>`).join("");
+ $("fs").innerHTML='<option value="">全て</option>'+shs.map(d=>`<option>${esc(d)}</option>`).join("");
+ if(shs.includes("日勤"))$("fs").value="日勤";
+ const ds=DB.map(r=>r.date).sort();$("ff").value=ds[0];$("ft").value=ds[ds.length-1];
+ $("board").classList.remove("hidden");render()}
+function F(){return{d:$("fd").value,s:$("fs").value,f:$("ff").value,t:$("ft").value}}
+function sel(o={}){const f=F();return DB.filter(r=>(o.noD||!f.d||r.dept===f.d)&&(o.noS||!f.s||r.shift===f.s)&&(!f.f||r.date>=f.f)&&(!f.t||r.date<=f.t))}
+const scopeText=(o={})=>{const f=F();return[o.noD||!f.d?"全部署":f.d,o.noS||!f.s?"全勤務区分":f.s,(f.f||"")+"〜"+(f.t||"")].join("・")};
+
+/* ---------- 集計 ---------- */
+function stat(a){const t=sumMin(a),n=nSess(a),s=SPK.map(k=>pct(sumMin(a,r=>r.sp===k),t));
+ return{n:n,t:t,per:n?t/n:0,sp:s,grp:GL.map(k=>pct(sumMin(a,r=>r.grp===k),t)),tr:s[1]+s[2],pro:s[0],rv:pct(sumMin(a,r=>r.rv),t)}}
+const topRv=(a,k)=>{const t=sumMin(a);return[...groupBy(a.filter(r=>r.rv),r=>r.task)].map(([n,x])=>[n,pct(sumMin(x),t)]).sort((p,q)=>q[1]-p[1]).slice(0,k)};
+
+/* ---------- 図の部品（SVG） ---------- */
+function legend(el,names,cols){$(el).innerHTML=names.map((n,i)=>`<span><i style="background:${cols[i]}"></i>${esc(n)}</span>`).join("")}
+function stackH(rows,names,cols){const LW=200,W=780,BW=W-LW-120,RH=32,H=rows.length*RH+6;let s=`<svg viewBox="0 0 ${W} ${H}" class="svg" role="img">`;
+ rows.forEach((r,i)=>{const y=i*RH+3,t=r.vals.reduce((a,b)=>a+b,0)||1;let x=LW;
+  s+=`<text x="${LW-8}" y="${y+18}" text-anchor="end" class="lb">${esc(r.label)}</text>`;
+  r.vals.forEach((v,k)=>{const w=v/t*BW;if(w<=0)return;s+=`<rect x="${x}" y="${y}" width="${w}" height="25" fill="${cols[k]}" stroke="var(--card)" stroke-width="1"><title>${esc(r.label)}　${esc(names[k])}　${f1(v/t*100)}％</title></rect>`;
+   if(w>24)s+=`<text x="${x+w/2}" y="${y+17}" text-anchor="middle" class="in">${f0(v/t*100)}</text>`;x+=w});
+  s+=`<text x="${LW+BW+8}" y="${y+17}" class="sm">${esc(r.note||"")}</text>`});return s+"</svg>"}
+function hBars(items){const LW=230,W=780,BW=W-LW-190,RH=28,mx=Math.max(...items.map(i=>i.v),1e-9);let s=`<svg viewBox="0 0 ${W} ${items.length*RH+6}" class="svg" role="img">`;
+ items.forEach((it,i)=>{const y=i*RH+3,w=it.v/mx*BW;s+=`<text x="${LW-8}" y="${y+17}" text-anchor="end" class="lb">${esc(it.label)}</text><rect x="${LW}" y="${y+2}" width="${Math.max(w,1)}" height="20" rx="2" fill="${it.color}"><title>${esc(it.label)}</title></rect><text x="${LW+w+6}" y="${y+17}" class="sm">${esc(it.note)}</text>`});return s+"</svg>"}
+function colBars(labels,vals,unit){const W=780,H=170,L=44,B=26,BW=(W-L-10)/labels.length,mx=Math.max(...vals,1e-9);let s=`<svg viewBox="0 0 ${W} ${H}" class="svg" role="img"><line x1="${L}" y1="${H-B}" x2="${W-6}" y2="${H-B}" class="ax"/>`;
+ vals.forEach((v,i)=>{const h=v/mx*(H-B-22),x=L+i*BW+4;s+=`<rect x="${x}" y="${H-B-h}" width="${BW-8}" height="${h}" rx="2" fill="#2a78d6"><title>${esc(labels[i])}　${f1(v)}${unit}</title></rect><text x="${x+(BW-8)/2}" y="${H-8}" text-anchor="middle" class="sm">${esc(labels[i])}</text>`;if(v>0)s+=`<text x="${x+(BW-8)/2}" y="${H-B-h-4}" text-anchor="middle" class="sm">${f0(v)}</text>`});return s+"</svg>"}
+function heat(rl,cl,M){const LW=200,W=780,CW=(W-LW-6)/cl.length,RH=26,gm=Math.max(...M.flat(),1e-9);let s=`<svg viewBox="0 0 ${W} ${rl.length*RH+30}" class="svg" role="img">`;
+ cl.forEach((c,j)=>s+=`<text x="${LW+j*CW+CW/2}" y="14" text-anchor="middle" class="sm">${esc(c)}</text>`);
+ rl.forEach((r,i)=>{const y=i*RH+22;s+=`<text x="${LW-8}" y="${y+16}" text-anchor="end" class="lb">${esc(r)}</text>`;
+  M[i].forEach((v,j)=>{s+=`<rect x="${LW+j*CW}" y="${y}" width="${CW-1}" height="${RH-2}" fill="#2a78d6" fill-opacity="${(v/gm*0.92).toFixed(3)}"><title>${esc(r)}　${esc(cl[j])}　${f1(v*100)}％</title></rect>`;
+   if(v>=0.1)s+=`<text x="${LW+j*CW+CW/2}" y="${y+16}" text-anchor="middle" class="${v/gm>0.45?"in":"sm"}">${f0(v*100)}</text>`})});return s+"</svg>"}
+function strip(rows,lo,hi){const LW=90,W=780,PW=W-LW-30,RH=64;const X=v=>LW+(v-lo)/(hi-lo||1)*PW;let s=`<svg viewBox="0 0 ${W} ${rows.length*RH+30}" class="svg" role="img">`;
+ for(let g=Math.ceil(lo/10)*10;g<=hi;g+=10)s+=`<line x1="${X(g)}" y1="6" x2="${X(g)}" y2="${rows.length*RH}" class="ax"/><text x="${X(g)}" y="${rows.length*RH+16}" text-anchor="middle" class="sm">${g}％</text>`;
+ rows.forEach((r,i)=>{const y=i*RH+30;s+=`<text x="${LW-8}" y="${y+4}" text-anchor="end" class="lb">${esc(r.label)}</text>`;
+  r.pts.forEach(p=>s+=`<circle cx="${X(p.v)}" cy="${y}" r="6" fill="#2a78d6" fill-opacity=".7"><title>${esc(p.l)}　${f1(p.v)}％</title></circle>`);
+  if(r.med!=null)s+=`<line x1="${X(r.med)}" y1="${y-16}" x2="${X(r.med)}" y2="${y+16}" stroke="#d4561f" stroke-width="2.5"/><text x="${X(r.med)}" y="${y+30}" text-anchor="middle" class="sm" style="fill:#d4561f">中央値 ${f0(r.med)}％</text>`});return s+"</svg>"}
+const cm=(id,arr)=>{$(id).innerHTML="<h3 style=\"margin-top:0\">解析コメント（自動作成）</h3><ul>"+arr.map(t=>`<li>${esc(t)}</li>`).join("")+"</ul>"};
+
+/* ---------- ① 部署間比較 ---------- */
+function tab1(){const a=sel({noD:true}),M=$("m1").value,names=M==="sp"?SPN:GL,cols=M==="sp"?SPC:GC;
+ const bd=[...groupBy(a,r=>r.dept)].map(([d,x])=>({d:d,x:x,s:stat(x)})).sort((p,q)=>M==="sp"?q.s.tr-p.s.tr:q.s.grp[0]-p.s.grp[0]);
+ legend("l1",names,cols);$("c1").innerHTML=bd.length?stackH(bd.map(o=>({label:o.d,vals:M==="sp"?o.s.sp:o.s.grp,note:o.s.n+"勤務"+(o.s.n<5?" ※少数":"")})),names,cols):"<p class=msg>データがありません。</p>";
+ if(!bd.length){cm("x1",["対象のデータがありません。"]);return}
+ const S=stat(a),o=[`対象は${bd.length}部署・${S.n}勤務です（${scopeText({noD:true})}）。${M==="sp"?"部署は、②③の割合が高い順に並べています。":"部署は、直接看護の割合が高い順に並べています。"}`];
+ const few=bd.filter(x=>x.s.n<5).map(x=>x.d);if(few.length)o.push(`測定勤務が5件未満の部署（${few.join("、")}）は、偏りが大きい可能性があるため、参考値として見てください。`);
+ o.push(`全体の構成は、${SPN.map((k,i)=>k+" "+f0(S.sp[i])+"％").join("、")}です。`);
+ const el=bd.filter(x=>x.s.n>=3);
+ if(el.length>=2){const t=[...el].sort((p,q)=>q.s.tr-p.s.tr),hi=t[0],lo=t[t.length-1];
+  o.push(`②③（看護師以外にも移せる可能性のある業務）の割合が最も高いのは「${hi.d}」（${f0(hi.s.tr)}％）、最も低いのは「${lo.d}」（${f0(lo.s.tr)}％）で、${f0(hi.s.tr-lo.s.tr)}ポイントの差があります。`);
+  const up=t.filter(x=>x.s.tr>=S.tr+5);if(up.length)o.push(`全体（${f0(S.tr)}％）を5ポイント以上上回るのは${up.map(x=>"「"+x.d+"」（"+f0(x.s.tr)+"％）").join("、")}で、補助者の配置や業務分担の見直しを検討する際の候補になります。ただし②は一部だけ移せる業務のため、実際に移せる量は「② 業務別」の内訳で確認してください。`);
+  const tm=[...el].sort((p,q)=>q.s.per*q.s.tr-p.s.per*p.s.tr)[0];o.push(`1勤務あたりの②③の時間が最も長いのは「${tm.d}」（約${f0(tm.s.per*tm.s.tr/100)}分）です。`);
+  const pr=[...el].sort((p,q)=>q.s.pro-p.s.pro).slice(0,2);o.push(`①（専門性の高い業務）の割合が高いのは${pr.map(x=>"「"+x.d+"」（"+f0(x.s.pro)+"％）").join("、")}です。看護師の配置を検討する際は、患者数・重症度・勤務人数とあわせて確認してください。`);
+  const rv=[...el].sort((p,q)=>q.s.rv-p.s.rv)[0],tr=topRv(rv.x,2);o.push(`見直し検討対象（記録・申し送り・会議・待ち時間）の割合が最も高いのは「${rv.d}」（${f0(rv.s.rv)}％）で、${tr.map(t=>"「"+t[0]+"」（"+f0(t[1])+"％）").join("、")}が主な内訳です。`)}
+ else o.push("測定勤務が3件以上の部署が2つ未満のため、部署間の比較コメントは出せません。");cm("x1",o)}
+
+/* ---------- ② 業務別 ---------- */
+function tab2(){const a=sel(),t=sumMin(a),n=nSess(a);legend("l2",SPN,SPC);
+ const it=[...groupBy(a,r=>r.task)].map(([k,x])=>({k:k,v:sumMin(x),sp:x[0].sp,rv:x[0].rv,per:n?sumMin(x)/n:0})).sort((p,q)=>q.v-p.v);
+ if(!it.length){$("c2").innerHTML="<p class=msg>データがありません。</p>";cm("x2",["対象のデータがありません。"]);return}
+ $("c2").innerHTML=hBars(it.slice(0,15).map(i=>({label:(i.rv?"◎ ":"")+i.k,v:i.v,color:SPC[SPK.indexOf(i.sp)],note:f1(pct(i.v,t))+"％（"+f0(i.per)+"分/勤務）"})));
+ const o=[`対象は${n}勤務、記録時間の合計は約${f0(t/60)}時間です（${scopeText()}）。${n<5?"測定勤務が少ないため参考値です。":""}`],t3=it.slice(0,3);
+ o.push(`時間の長い上位3業務は${t3.map(i=>"「"+i.k+"」（"+f1(pct(i.v,t))+"％）").join("、")}で、合わせて${f0(pct(t3.reduce((s,i)=>s+i.v,0),t))}％です。`);
+ [2,1].forEach(k=>{const x=it.filter(i=>i.sp===SPK[k]);if(x.length)o.push(`${SPN[k]}の業務で最も長いのは「${x[0].k}」（${f1(pct(x[0].v,t))}％、1勤務あたり${f0(x[0].per)}分）で、この区分の合計は${f1(pct(x.reduce((s,i)=>s+i.v,0),t))}％です。`)});
+ const rv=it.filter(i=>i.rv);if(rv.length)o.push(`見直し検討対象（◎）の業務は合計${f1(pct(rv.reduce((s,i)=>s+i.v,0),t))}％（1勤務あたり${f0(rv.reduce((s,i)=>s+i.per,0))}分）で、最も長いのは「${rv[0].k}」（${f1(pct(rv[0].v,t))}％）です。`);
+ const wt=it.find(i=>i.k==="移動・待ち時間");if(wt&&pct(wt.v,t)>=5)o.push(`「移動・待ち時間」が${f1(pct(wt.v,t))}％を占めています。動線や準備の待ちを確認する余地があるかもしれません。`);cm("x2",o)}
+
+/* ---------- ③ 勤務区分比較 ---------- */
+function tab3(){const a=sel({noS:true}),M=$("m3").value,names=M==="sp"?SPN:GL,cols=M==="sp"?SPC:GC;
+ const bd=[...groupBy(a,r=>r.shift)].map(([s,x])=>({s:s,x:x,st:stat(x)})).sort((p,q)=>(SHIFTS.indexOf(p.s)+99)%99-(SHIFTS.indexOf(q.s)+99)%99);
+ legend("l3",names,cols);if(!bd.length){$("c3").innerHTML="<p class=msg>データがありません。</p>";cm("x3",["対象のデータがありません。"]);return}
+ $("c3").innerHTML=stackH(bd.map(o=>({label:o.s,vals:M==="sp"?o.st.sp:o.st.grp,note:o.st.n+"勤務・"+f0(o.st.per)+"分/勤務"+(o.st.n<5?" ※少数":"")})),names,cols);
+ const o=[`対象は${bd.length}種類の勤務区分・${nSess(a)}勤務です（${scopeText({noS:true})}）。`];
+ const few=bd.filter(x=>x.st.n<5).map(x=>x.s);if(few.length)o.push(`測定勤務が5件未満の区分（${few.join("、")}）は、参考値として見てください。`);
+ const ref=bd.find(x=>x.s==="日勤"&&x.st.n>=3)||[...bd].sort((p,q)=>q.st.n-p.st.n)[0];
+ bd.filter(x=>x!==ref&&x.st.n>=3).forEach(x=>{const d=GL.map((g,i)=>({g:g,v:x.st.grp[i]-ref.st.grp[i]})).sort((p,q)=>Math.abs(q.v)-Math.abs(p.v)).filter(e=>Math.abs(e.v)>=3).slice(0,2);
+  if(d.length)o.push(`「${x.s}」は、「${ref.s}」と比べて、${d.map(e=>e.g+"が"+(e.v>0?"＋":"−")+f0(Math.abs(e.v))+"ポイント").join("、")}です。`);
+  const dt=x.st.tr-ref.st.tr;if(Math.abs(dt)>=5)o.push(`「${x.s}」は、②③の割合が「${ref.s}」より${f0(Math.abs(dt))}ポイント${dt>0?"高く":"低く"}なっています。`)});
+ if(o.length<=2)o.push("基準にできる勤務区分（測定勤務3件以上）との差が小さいか、比較できる区分が不足しています。");cm("x3",o)}
+
+/* ---------- ④ 部署内のばらつき ---------- */
+const MET=[["①看護師必須の割合",a=>pct(sumMin(a,r=>r.sp===SPK[0]),sumMin(a))],["②③（移管余地）の割合",a=>pct(sumMin(a,r=>r.sp===SPK[1]||r.sp===SPK[2]),sumMin(a))],["見直し検討対象の割合",a=>pct(sumMin(a,r=>r.rv),sumMin(a))],["直接看護の割合",a=>pct(sumMin(a,r=>r.grp==="直接看護"),sumMin(a))],["記録・事務の割合",a=>pct(sumMin(a,r=>r.grp==="記録・事務"),sumMin(a))]];
+const plabel=i=>"職員"+(i<26?String.fromCharCode(65+i):i+1),sd=v=>{const m=v.reduce((a,b)=>a+b,0)/v.length;return Math.sqrt(v.reduce((s,x)=>s+(x-m)*(x-m),0)/v.length)},med=v=>{const s=[...v].sort((a,b)=>a-b),m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2};
+function tab4(){const f=F();if(!f.d){$("c4").innerHTML="";cm("x4",["上の「部署」で、1つの部署を選んでください。"]);return}
+ const a=sel(),mi=+$("m4").value,mf=MET[mi][1];if(!a.length){$("c4").innerHTML="<p class=msg>データがありません。</p>";cm("x4",["対象のデータがありません。"]);return}
+ const dates=[...groupBy(a,r=>r.date)].sort((p,q)=>p[0]<q[0]?-1:1).map(([d,x])=>({l:dlabel(d),x:x,v:mf(x),n:nSess(x)}));
+ const pids=[...new Set(a.map(r=>r.staff))].sort(),pl=new Map(pids.map((k,i)=>[k,k?plabel(i):"（番号なし）"]));
+ const ppl=[...groupBy(a,r=>r.staff)].map(([k,x])=>({l:pl.get(k),x:x,v:mf(x),n:nSess(x)})).sort((p,q)=>p.l<q.l?-1:1);
+ const comp=(x)=>GL.map((g,i)=>sumMin(x,r=>r.grp===g));
+ let h=legHtml(GL,GC)+`<h3>日ごとの業務構成（大分類）</h3>`;
+ h+=stackH(dates.slice(-30).map(d=>({label:d.l,vals:comp(d.x),note:d.n+"勤務"})),GL,GC)+`<h3>職員ごとの業務構成（大分類）　※職員番号は、元に戻せない記号に置き換えています</h3>`+stackH(ppl.map(d=>({label:d.l,vals:comp(d.x),note:d.n+"勤務"})),GL,GC);
+ h+=`<h3>「${MET[mi][0]}」のばらつき（点＝1日、または1人）</h3>`+strip([{label:"日ごと",pts:dates.map(d=>({v:d.v,l:d.l})),med:med(dates.map(d=>d.v))},{label:"職員ごと",pts:ppl.map(d=>({v:d.v,l:d.l})),med:med(ppl.map(d=>d.v))}],0,Math.max(20,Math.ceil(Math.max(...dates.map(d=>d.v),...ppl.map(d=>d.v))/10)*10));
+ $("c4").innerHTML=h;
+ const o=[`対象は「${f.d}」、${nSess(a)}勤務・${dates.length}日・${ppl.length}人です（${scopeText()}）。指標は「${MET[mi][0]}」です。`];
+ const ex=(arr,key)=>{const s=[...arr].sort((p,q)=>q.v-p.v),hi=s[0],lo=s[s.length-1],w=sd(arr.map(x=>x.v));return`${key}では、${hi.l}（${f0(hi.v)}％）が最大、${lo.l}（${f0(lo.v)}％）が最小で、${f0(hi.v-lo.v)}ポイントの幅があります（標準偏差${f1(w)}ポイント）。`+(hi.v-lo.v>=20?"ばらつきが大きい傾向です。":hi.v-lo.v>=10?"ややばらつきがあります。":"比較的そろっています。")};
+ if(dates.length>=3)o.push(ex(dates,"日ごと"));else o.push("日数が3日未満のため、日によるばらつきは評価できません。");
+ const pe=ppl.filter(x=>x.n>=2);if(pe.length>=3){o.push(ex(pe,"職員ごと（2勤務以上の職員）"));o.push("職員ごとの差は、役割・受け持ち患者・勤務の組み合わせの違いも反映します。個人の評価には使わず、業務の偏りや仕組みの確認に使ってください。")}
+ else o.push("2勤務以上の職員が3人未満のため、人によるばらつきは評価できません。");cm("x4",o)}
+function legHtml(n,c){return'<div class="leg">'+n.map((x,i)=>`<span><i style="background:${c[i]}"></i>${esc(x)}</span>`).join("")+'</div>'}
+
+/* ---------- ⑤ 時間帯別 ---------- */
+function tab5(){const a=sel(),M=$("m5").value,key=r=>M==="grp"?r.grp:r.task;
+ const H=new Map(),T=new Array(24).fill(0);
+ a.forEach(r=>{let t=+r.st;const e=+r.en;while(t<e){const nx=Math.min(e,(Math.floor(t/36e5)+1)*36e5),h=new Date(t).getHours(),m=(nx-t)/6e4,k=key(r);if(!H.has(k))H.set(k,new Array(24).fill(0));H.get(k)[h]+=m;T[h]+=m;t=nx}});
+ if(!H.size){$("c5").innerHTML="<p class=msg>データがありません。</p>";cm("x5",["対象のデータがありません。"]);return}
+ const ph=[...T.keys()].filter(h=>T[h]>0);let gap=0,st=ph[0];for(let i=0;i<ph.length;i++){const nx=ph[(i+1)%ph.length],g=(nx-ph[i]+24)%24;if(g>gap){gap=g;st=nx}}
+ const hs=ph.map((_,i)=>0).length?[...ph].sort((p,q)=>(p-st+24)%24-(q-st+24)%24):[];
+ const n=nSess(a),rows=[...H.keys()].sort((p,q)=>M==="grp"?GL.indexOf(p)-GL.indexOf(q):H.get(q).reduce((x,y)=>x+y,0)-H.get(p).reduce((x,y)=>x+y,0)),cl=hs.map(h=>h+"時");
+ const mat=rows.map(k=>{const v=H.get(k),t=v.reduce((x,y)=>x+y,0)||1;return hs.map(h=>v[h]/t)});
+ $("c5").innerHTML=`<h3>時間帯ごとの記録量（1勤務あたりの分）</h3>`+colBars(cl,hs.map(h=>T[h]/n),"分")+`<h3>業務が行われている時間帯の分布（各行の合計＝100％）</h3>`+heat(rows,cl,mat);
+ const o=[`対象は${n}勤務です（${scopeText()}）。${F().s?"":"勤務区分が混ざると、時間帯の分布が重なります。勤務区分を1つ選ぶと、より正確に見られます。"}`];
+ const pk=hs.reduce((b,h)=>T[h]>T[b]?h:b,hs[0]);o.push(`記録量が最も多い時間帯は${pk}時台（1勤務あたり約${f0(T[pk]/n)}分）です。`);
+ const big=rows.map(k=>({k:k,v:H.get(k),t:H.get(k).reduce((x,y)=>x+y,0)})).sort((p,q)=>q.t-p.t).slice(0,M==="grp"?4:5);
+ big.forEach(b=>{const s=hs.map(h=>({h:h,p:b.v[h]/b.t})).sort((p,q)=>q.p-p.p),top2=s[0].p+(s[1]?s[1].p:0);o.push(`「${b.k}」は、${s[0].h}時台が最も多く（その業務の${f0(s[0].p*100)}％）、上位2つの時間帯で${f0(top2*100)}％を占めます。${top2>=0.5?"特定の時間帯に集中しています。":"時間帯への偏りは小さめです。"}`)});
+ cm("x5",o)}
+
+/* ---------- 画面 ---------- */
+const TABS={1:tab1,2:tab2,3:tab3,4:tab4,5:tab5};
+function render(){const a=sel();$("scope").textContent="対象：約"+nSess(a)+"勤務・"+a.length+"件の記録（"+scopeText()+"）";TABS[CUR]()}
+function show(t){CUR=+t;[1,2,3,4,5].forEach(i=>{$("t"+i).classList.toggle("on",i===CUR)});document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("on",+b.dataset.t===CUR));render()}
+$("nav").onclick=e=>{if(e.target.dataset.t)show(e.target.dataset.t)};
+["fd","fs","ff","ft","m1","m3","m4","m5"].forEach(i=>$(i).addEventListener("change",render));
+$("m4").innerHTML=MET.map((m,i)=>`<option value="${i}">${m[0]}</option>`).join("");
+$("load").onclick=load;$("print").onclick=()=>window.print();
+window.addEventListener("beforeprint",()=>{if(!DB.length)return;const c=CUR;[1,2,3,4,5].forEach(i=>{CUR=i;TABS[i]()});CUR=c});
+try{const c=JSON.parse(localStorage.getItem("ana_cfg")||"{}");if(c.u)$("url").value=c.u}catch(e){}
+</script>
+</body>
+</html>
